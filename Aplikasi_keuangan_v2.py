@@ -74,7 +74,7 @@ st.divider()
 # --- MENU KEUANGAN ---
 menu = st.sidebar.radio(
     "=== MENU KEUANGAN ===",
-    ["1. Pemasukan", "2. Pengeluaran", "3. Tabungan", "4. Riwayat", "5. Lihat Saldo", "6. Keluar/Info"]
+    ["1. Pemasukan", "2. Pengeluaran", "3. Tabungan", "4. Riwayat", "5. Lihat Saldo", "6. Hapus Data", "7. Keluar/Info"]
 )
 
 # 1. PEMASUKAN
@@ -215,8 +215,20 @@ elif menu == "5. Lihat Saldo":
     st.write(f"**Total Pengeluaran:** {format_rupiah(total_pengeluaran)}")
     st.write(f"**Total Tabungan:** {format_rupiah(total_tabungan)}")
 
-# 6. KELUAR / INFO
-elif menu == "6. Keluar/Info":
+# 6. HAPUS DATA
+elif menu == "6. Hapus Data":
+    st.subheader("🗑️ Hapus / Reset Semua Data Transaksi")
+    st.warning("Tindakan ini akan menghapus SELURUH catatan transaksi dan mengembalikan saldo ke Rp0.")
+    
+    konfirmasi = st.checkbox("Saya yakin ingin menghapus seluruh data transaksi.")
+    if konfirmasi:
+        if st.button("🔴 HAPUS SEMUA DATA SEKARANG", type="primary"):
+            save_data([]) # Mengosongkan file JSON
+            st.success("Semua data transaksi berhasil dihapus!")
+            st.rerun()
+
+# 7. KELUAR / INFO
+elif menu == "7. Keluar/Info":
     st.info("""
     ===============================  
     === TERIMA KASIH TELAH MENGGUNAKAN ===  
