@@ -1,16 +1,18 @@
 import json
 import os
 import streamlit as st
+import pandas as pd
+import plotly.express as px
 from datetime import datetime, date
 
-# --- CONFIGURASI HALAMAN ---
+# --- KONFIGURASI HALAMAN ---
 st.set_page_config(
     page_title="Aplikasi Keuangan Keluarga DY",
     page_icon="💰",
-    layout="centered"
+    layout="wide"  # Menggunakan layar lebar agar grafik lebih leluasa
 )
 
-# --- INISIALISASI SESSION STATE (Memori Input) ---
+# --- INISIALISASI SESSION STATE (Memori Input agar tidak hilang saat pindah menu) ---
 if "pem_kategori" not in st.session_state:
     st.session_state["pem_kategori"] = ""
 if "pem_keterangan" not in st.session_state:
@@ -68,36 +70,88 @@ for data in riwayat:
         saldo += nominal
         total_tabungan -= nominal
 
-# --- HEADER & DASHBOARD ---
-st.title("===========================")
-st.title("APLIKASI KEUANGAN KELUARGA")
-st.title("===========================")
+# --- HEADER UTAMA ---
+st.title("💰 APLIKASI KEUANGAN KELUARGA DY")
+st.caption("Kelola Pemasukan, Pengeluaran, dan Tabungan Keluarga dengan Mudah")
 
-col1, col2 = st.columns(2)
+# --- DASHBOARD CARD (Ringkasan Berwarna) ---
+col1, col2, col3, col4 = st.columns(4)
+
 with col1:
-    st.metric(label="💰 Saldo Dompet Utama", value=format_rupiah(saldo))
-    st.metric(label="📉 Total Pengeluaran", value=format_rupiah(total_pengeluaran))
+    with st.container(border=True):
+        st.metric(label="💰 Saldo Dompet Utama", value=format_rupiah(saldo))
+
 with col2:
-    st.metric(label="📈 Total Pemasukan", value=format_rupiah(total_pemasukan))
-    st.metric(label="🏦 Total Tabungan", value=format_rupiah(total_tabungan))
+    with st.container(border=True):
+        st.metric(label="📈 Total Pemasukan", value=format_rupiah(total_pemasukan))
+
+with col3:
+    with st.container(border=True):
+        st.metric(label="📉 Total Pengeluaran", value=format_rupiah(total_pengeluaran))
+
+with col4:
+    with st.container(border=True):
+        st.metric(label="🏦 Total Tabungan", value=format_rupiah(total_tabungan))
 
 if saldo < 0:
     st.error(f"⚠️ PERINGATAN: Status DEFISIT! Saldo Defisit: {format_rupiah(saldo)}")
 
 st.divider()
 
-# --- MENU KEUANGAN ---
+# --- MENU KEUANGAN (SIDEBAR) ---
 menu = st.sidebar.radio(
     "=== MENU KEUANGAN ===",
-    ["1. Pemasukan", "2. Pengeluaran", "3. Tabungan", "4. Riwayat", "5. Lihat Saldo", "6. Hapus Data", "7. Keluar/Info"]
+    ["📊 Dashboard & Grafik", "1. Pemasukan", "2. Pengeluaran", "3. Tabungan", "4. Riwayat", "5. Lihat Saldo", "6. Hapus Data", "7. Keluar/Info"]
 )
 
+# 📊 DASHBOARD & GRAFIK (Tampilan Visual Wah)
+if menu == "📊 Dashboard & Grafik":
+    st.subheader("📈 Analisis Visual Keuangan")
+    
+    if len(riwayat) == 0:
+        st.info("Belum ada data transaksi untuk ditampilkan grafik. Silakan tambahkan transaksi terlebih dahulu.")
+    else:
+        df = pd.DataFrame(riwayat)
+        
+        g1, g2 = st.columns(2)
+        
+        with g1:
+            st.markdown("##### 🍕 Proporsi Pengeluaran per Kategori")
+            df_pengeluaran = df[df["jenis"] == "PENGELUARAN"]
+            if not df_pengeluaran.empty:
+                fig_pie = px.pie(
+                    df_pengeluaran, 
+                    names="kategori", 
+                    values="nominal", 
+                    hole=0.4,
+                    color_discrete_sequence=px.colors.qualitative.Pastel
+                )
+                fig_pie.update_traces(textposition='inside', textinfo='percent+label')
+                st.plotly_chart(fig_pie, use_container_width=True)
+            else:
+                st.caption("Belum ada data pengeluaran.")
+
+        with g2:
+            st.markdown("##### 📊 Perbandingan Pemasukan vs Pengeluaran")
+            df_summary = df[df["jenis"].isin(["PEMASUKAN", "PENGELUARAN"])]
+            if not df_summary.empty:
+                fig_bar = px.bar(
+                    df_summary, 
+                    x="jenis", 
+                    y="nominal", 
+                    color="jenis",
+                    color_discrete_map={"PEMASUKAN": "#00CC96", "PENGELUARAN": "#EF553B"},
+                    barmode="group"
+                )
+                st.plotly_chart(fig_bar, use_container_width=True)
+            else:
+                st.caption("Belum ada data transaksi untuk grafik batang.")
+
 # 1. PEMASUKAN
-if menu == "1. Pemasukan":
+elif menu == "1. Pemasukan":
     st.subheader("=== MENU PEMASUKAN ===")
     tgl_selected = st.date_input("Masukkan Tanggal", max_value=date.today())
     
-    # Input tersimpan otomatis di session_state
     kategori = st.text_input("Kategori", key="pem_kategori")
     keterangan = st.text_input("Keterangan", key="pem_keterangan")
     nominal = st.number_input("Nominal (Rp)", min_value=0, step=1000, key="pem_nominal")
@@ -110,7 +164,7 @@ if menu == "1. Pemasukan":
             transaksi_baru = {
                 "tanggal": tgl_str,
                 "jenis": "PEMASUKAN",
-                "kategori": kategori,
+                "kategori": kategori if kategori else "Umum",
                 "keterangan": keterangan,
                 "nominal": int(nominal)
             }
@@ -118,7 +172,6 @@ if menu == "1. Pemasukan":
             save_data(riwayat)
             st.success("Data pemasukan berhasil disimpan!")
             
-            # Reset form pemasukan setelah simpan
             st.session_state["pem_kategori"] = ""
             st.session_state["pem_keterangan"] = ""
             st.session_state["pem_nominal"] = 0
@@ -129,7 +182,6 @@ elif menu == "2. Pengeluaran":
     st.subheader("=== MENU PENGELUARAN ===")
     tgl_selected = st.date_input("Masukkan Tanggal", max_value=date.today())
     
-    # Input tersimpan otomatis di session_state
     kategori = st.text_input("Kategori", key="peng_kategori")
     keterangan = st.text_input("Keterangan", key="peng_keterangan")
     nominal = st.number_input("Nominal (Rp)", min_value=0, step=1000, key="peng_nominal")
@@ -142,7 +194,7 @@ elif menu == "2. Pengeluaran":
             transaksi_baru = {
                 "tanggal": tgl_str,
                 "jenis": "PENGELUARAN",
-                "kategori": kategori,
+                "kategori": kategori if kategori else "Lain-lain",
                 "keterangan": keterangan,
                 "nominal": int(nominal)
             }
@@ -150,7 +202,6 @@ elif menu == "2. Pengeluaran":
             save_data(riwayat)
             st.success("Data Pengeluaran berhasil disimpan.")
             
-            # Reset form pengeluaran setelah simpan
             st.session_state["peng_kategori"] = ""
             st.session_state["peng_keterangan"] = ""
             st.session_state["peng_nominal"] = 0
@@ -178,7 +229,7 @@ elif menu == "3. Tabungan":
                 else:
                     transaksi_baru = {
                         "tanggal": tgl_str, "hari": hari, "bulan": bulan, "tahun": tahun,
-                        "jenis": "SETOR TABUNGAN", "kategori": kategori, "keterangan": keterangan, "nominal": int(nominal)
+                        "jenis": "SETOR TABUNGAN", "kategori": kategori if kategori else "Tabungan", "keterangan": keterangan, "nominal": int(nominal)
                     }
                     riwayat.append(transaksi_baru)
                     save_data(riwayat)
@@ -190,7 +241,7 @@ elif menu == "3. Tabungan":
                 else:
                     transaksi_baru = {
                         "tanggal": tgl_str, "hari": hari, "bulan": bulan, "tahun": tahun,
-                        "jenis": "TARIK TABUNGAN", "kategori": kategori, "keterangan": keterangan, "nominal": int(nominal)
+                        "jenis": "TARIK TABUNGAN", "kategori": kategori if kategori else "Tabungan", "keterangan": keterangan, "nominal": int(nominal)
                     }
                     riwayat.append(transaksi_baru)
                     save_data(riwayat)
