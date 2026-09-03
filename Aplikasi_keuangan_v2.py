@@ -19,7 +19,6 @@ def load_data():
         df = conn.read(ttl="0s")
         if df.empty or "nominal" not in df.columns:
             return []
-        # Bersihkan data NaN/kosong
         df = df.dropna(how="all")
         df["nominal"] = pd.to_numeric(df["nominal"], errors="coerce").fillna(0).astype(int)
         return df.to_dict(orient="records")
@@ -53,6 +52,7 @@ def reset_form_pemasukan():
         save_data(riwayat_data)
         st.session_state["pem_kategori"] = ""
         st.session_state["pem_keterangan"] = ""
+        st.session_state["pem_nom_raw"] = ""
         st.session_state["pem_nominal"] = 0
         st.session_state["pesan_sukses"] = "Data pemasukan berhasil disimpan ke Google Sheets!"
     else:
@@ -77,6 +77,7 @@ def reset_form_pengeluaran():
         save_data(riwayat_data)
         st.session_state["peng_kategori"] = ""
         st.session_state["peng_keterangan"] = ""
+        st.session_state["peng_nom_raw"] = ""
         st.session_state["peng_nominal"] = 0
         st.session_state["pesan_sukses"] = "Data pengeluaran berhasil disimpan ke Google Sheets!"
     else:
@@ -207,7 +208,14 @@ elif menu == "1. Pemasukan":
     st.date_input("Masukkan Tanggal", max_value=date.today(), key="pem_tgl")
     st.text_input("Kategori", key="pem_kategori")
     st.text_input("Keterangan", key="pem_keterangan")
-    st.number_input("Nominal (Rp)", min_value=0, step=1000, key="pem_nominal")
+    
+    nom_input = st.text_input("Nominal (Rp)", placeholder="Contoh: 12000", key="pem_nom_raw")
+    nom_clean = "".join(filter(str.isdigit, nom_input))
+    nom_val = int(nom_clean) if nom_clean else 0
+    st.session_state["pem_nominal"] = nom_val
+    
+    if nom_val > 0:
+        st.info(f"💵 Tampilan Nominal: **{format_rupiah(nom_val)}**")
     
     st.button("Simpan Pemasukan", type="primary", on_click=reset_form_pemasukan)
 
@@ -217,7 +225,14 @@ elif menu == "2. Pengeluaran":
     st.date_input("Masukkan Tanggal", max_value=date.today(), key="peng_tgl")
     st.text_input("Kategori", key="peng_kategori")
     st.text_input("Keterangan", key="peng_keterangan")
-    st.number_input("Nominal (Rp)", min_value=0, step=1000, key="peng_nominal")
+    
+    nom_input = st.text_input("Nominal (Rp)", placeholder="Contoh: 12000", key="peng_nom_raw")
+    nom_clean = "".join(filter(str.isdigit, nom_input))
+    nom_val = int(nom_clean) if nom_clean else 0
+    st.session_state["peng_nominal"] = nom_val
+    
+    if nom_val > 0:
+        st.info(f"💵 Tampilan Nominal: **{format_rupiah(nom_val)}**")
     
     st.button("Simpan Pengeluaran", type="primary", on_click=reset_form_pengeluaran)
 
@@ -228,7 +243,13 @@ elif menu == "3. Tabungan":
     sub_pilihan = st.radio("Pilih Jenis Transaksi Tabungan", ["1. Setor Tabungan (Simpan Uang)", "2. Tarik Tabungan (Ambil Uang)"])
     kategori = st.text_input("Kategori")
     keterangan = st.text_input("Keterangan")
-    nominal = st.number_input("Nominal (Rp)", min_value=0, step=1000)
+    
+    nom_input = st.text_input("Nominal (Rp)", placeholder="Contoh: 12000")
+    nom_clean = "".join(filter(str.isdigit, nom_input))
+    nominal = int(nom_clean) if nom_clean else 0
+    
+    if nominal > 0:
+        st.info(f"💵 Tampilan Nominal: **{format_rupiah(nominal)}**")
     
     if st.button("Simpan Tabungan", type="primary"):
         if nominal <= 0:
