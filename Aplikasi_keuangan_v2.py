@@ -9,23 +9,58 @@ from datetime import datetime, date
 st.set_page_config(
     page_title="Aplikasi Keuangan Keluarga DY",
     page_icon="💰",
-    layout="wide"  # Menggunakan layar lebar agar grafik lebih leluasa
+    layout="wide"
 )
 
-# --- INISIALISASI SESSION STATE (Memori Input agar tidak hilang saat pindah menu) ---
-if "pem_kategori" not in st.session_state:
-    st.session_state["pem_kategori"] = ""
-if "pem_keterangan" not in st.session_state:
-    st.session_state["pem_keterangan"] = ""
-if "pem_nominal" not in st.session_state:
-    st.session_state["pem_nominal"] = 0
+# --- FUNGSI RESET FORM (CALLBACK) ---
+def reset_form_pemasukan():
+    # Simpan data sebelum reset
+    tgl_str = st.session_state.get("pem_tgl", date.today()).strftime("%d/%m/%Y")
+    kat = st.session_state.get("pem_kategori", "")
+    ket = st.session_state.get("pem_keterangan", "")
+    nom = st.session_state.get("pem_nominal", 0)
 
-if "peng_kategori" not in st.session_state:
-    st.session_state["peng_kategori"] = ""
-if "peng_keterangan" not in st.session_state:
-    st.session_state["peng_keterangan"] = ""
-if "peng_nominal" not in st.session_state:
-    st.session_state["peng_nominal"] = 0
+    if nom > 0:
+        transaksi_baru = {
+            "tanggal": tgl_str,
+            "jenis": "PEMASUKAN",
+            "kategori": kat if kat else "Umum",
+            "keterangan": ket,
+            "nominal": int(nom)
+        }
+        riwayat_data = load_data()
+        riwayat_data.append(transaksi_baru)
+        save_data(riwayat_data)
+        st.session_state["pem_kategori"] = ""
+        st.session_state["pem_keterangan"] = ""
+        st.session_state["pem_nominal"] = 0
+        st.session_state["pesan_sukses"] = "Data pemasukan berhasil disimpan!"
+    else:
+        st.session_state["pesan_peringatan"] = "Nominal harus lebih dari 0."
+
+def reset_form_pengeluaran():
+    tgl_str = st.session_state.get("peng_tgl", date.today()).strftime("%d/%m/%Y")
+    kat = st.session_state.get("peng_kategori", "")
+    ket = st.session_state.get("peng_keterangan", "")
+    nom = st.session_state.get("peng_nominal", 0)
+
+    if nom > 0:
+        transaksi_baru = {
+            "tanggal": tgl_str,
+            "jenis": "PENGELUARAN",
+            "kategori": kat if kat else "Lain-lain",
+            "keterangan": ket,
+            "nominal": int(nom)
+        }
+        riwayat_data = load_data()
+        riwayat_data.append(transaksi_baru)
+        save_data(riwayat_data)
+        st.session_state["peng_kategori"] = ""
+        st.session_state["peng_keterangan"] = ""
+        st.session_state["peng_nominal"] = 0
+        st.session_state["pesan_sukses"] = "Data pengeluaran berhasil disimpan!"
+    else:
+        st.session_state["pesan_peringatan"] = "Nominal harus lebih dari 0."
 
 # --- FUNGSI HELPER & DATA ---
 FILE_DATA = "data_keuangan.json"
@@ -74,7 +109,16 @@ for data in riwayat:
 st.title("💰 APLIKASI KEUANGAN KELUARGA DY")
 st.caption("Kelola Pemasukan, Pengeluaran, dan Tabungan Keluarga dengan Mudah")
 
-# --- DASHBOARD CARD (Ringkasan Berwarna) ---
+# Tampilkan notifikasi jika ada pesan tersimpan
+if "pesan_sukses" in st.session_state:
+    st.success(st.session_state["pesan_sukses"])
+    del st.session_state["pesan_sukses"]
+
+if "pesan_peringatan" in st.session_state:
+    st.warning(st.session_state["pesan_peringatan"])
+    del st.session_state["pesan_peringatan"]
+
+# --- DASHBOARD CARD ---
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
@@ -104,7 +148,7 @@ menu = st.sidebar.radio(
     ["📊 Dashboard & Grafik", "1. Pemasukan", "2. Pengeluaran", "3. Tabungan", "4. Riwayat", "5. Lihat Saldo", "6. Hapus Data", "7. Keluar/Info"]
 )
 
-# 📊 DASHBOARD & GRAFIK (Tampilan Visual Wah)
+# 📊 DASHBOARD & GRAFIK
 if menu == "📊 Dashboard & Grafik":
     st.subheader("📈 Analisis Visual Keuangan")
     
@@ -112,7 +156,6 @@ if menu == "📊 Dashboard & Grafik":
         st.info("Belum ada data transaksi untuk ditampilkan grafik. Silakan tambahkan transaksi terlebih dahulu.")
     else:
         df = pd.DataFrame(riwayat)
-        
         g1, g2 = st.columns(2)
         
         with g1:
@@ -150,62 +193,22 @@ if menu == "📊 Dashboard & Grafik":
 # 1. PEMASUKAN
 elif menu == "1. Pemasukan":
     st.subheader("=== MENU PEMASUKAN ===")
-    tgl_selected = st.date_input("Masukkan Tanggal", max_value=date.today())
+    st.date_input("Masukkan Tanggal", max_value=date.today(), key="pem_tgl")
+    st.text_input("Kategori", key="pem_kategori")
+    st.text_input("Keterangan", key="pem_keterangan")
+    st.number_input("Nominal (Rp)", min_value=0, step=1000, key="pem_nominal")
     
-    kategori = st.text_input("Kategori", key="pem_kategori")
-    keterangan = st.text_input("Keterangan", key="pem_keterangan")
-    nominal = st.number_input("Nominal (Rp)", min_value=0, step=1000, key="pem_nominal")
-    
-    if st.button("Simpan Pemasukan", type="primary"):
-        if nominal <= 0:
-            st.warning("Nominal harus lebih dari 0.")
-        else:
-            tgl_str = tgl_selected.strftime("%d/%m/%Y")
-            transaksi_baru = {
-                "tanggal": tgl_str,
-                "jenis": "PEMASUKAN",
-                "kategori": kategori if kategori else "Umum",
-                "keterangan": keterangan,
-                "nominal": int(nominal)
-            }
-            riwayat.append(transaksi_baru)
-            save_data(riwayat)
-            st.success("Data pemasukan berhasil disimpan!")
-            
-            st.session_state["pem_kategori"] = ""
-            st.session_state["pem_keterangan"] = ""
-            st.session_state["pem_nominal"] = 0
-            st.rerun()
+    st.button("Simpan Pemasukan", type="primary", on_click=reset_form_pemasukan)
 
 # 2. PENGELUARAN
 elif menu == "2. Pengeluaran":
     st.subheader("=== MENU PENGELUARAN ===")
-    tgl_selected = st.date_input("Masukkan Tanggal", max_value=date.today())
+    st.date_input("Masukkan Tanggal", max_value=date.today(), key="peng_tgl")
+    st.text_input("Kategori", key="peng_kategori")
+    st.text_input("Keterangan", key="peng_keterangan")
+    st.number_input("Nominal (Rp)", min_value=0, step=1000, key="peng_nominal")
     
-    kategori = st.text_input("Kategori", key="peng_kategori")
-    keterangan = st.text_input("Keterangan", key="peng_keterangan")
-    nominal = st.number_input("Nominal (Rp)", min_value=0, step=1000, key="peng_nominal")
-    
-    if st.button("Simpan Pengeluaran", type="primary"):
-        if nominal <= 0:
-            st.warning("Nominal harus lebih dari 0.")
-        else:
-            tgl_str = tgl_selected.strftime("%d/%m/%Y")
-            transaksi_baru = {
-                "tanggal": tgl_str,
-                "jenis": "PENGELUARAN",
-                "kategori": kategori if kategori else "Lain-lain",
-                "keterangan": keterangan,
-                "nominal": int(nominal)
-            }
-            riwayat.append(transaksi_baru)
-            save_data(riwayat)
-            st.success("Data Pengeluaran berhasil disimpan.")
-            
-            st.session_state["peng_kategori"] = ""
-            st.session_state["peng_keterangan"] = ""
-            st.session_state["peng_nominal"] = 0
-            st.rerun()
+    st.button("Simpan Pengeluaran", type="primary", on_click=reset_form_pengeluaran)
 
 # 3. TABUNGAN
 elif menu == "3. Tabungan":
@@ -221,15 +224,14 @@ elif menu == "3. Tabungan":
             st.warning("Nominal harus lebih dari 0.")
         else:
             tgl_str = tgl_selected.strftime("%d/%m/%Y")
-            hari, bulan, tahun = tgl_selected.day, tgl_selected.month, tgl_selected.year
-            
             if "1. Setor Tabungan" in sub_pilihan:
                 if nominal > saldo:
                     st.error("Saldo tidak mencukupi untuk menabung.")
                 else:
                     transaksi_baru = {
-                        "tanggal": tgl_str, "hari": hari, "bulan": bulan, "tahun": tahun,
-                        "jenis": "SETOR TABUNGAN", "kategori": kategori if kategori else "Tabungan", "keterangan": keterangan, "nominal": int(nominal)
+                        "tanggal": tgl_str, "jenis": "SETOR TABUNGAN",
+                        "kategori": kategori if kategori else "Tabungan",
+                        "keterangan": keterangan, "nominal": int(nominal)
                     }
                     riwayat.append(transaksi_baru)
                     save_data(riwayat)
@@ -240,8 +242,9 @@ elif menu == "3. Tabungan":
                     st.error("Tabungan tidak mencukupi untuk ditarik.")
                 else:
                     transaksi_baru = {
-                        "tanggal": tgl_str, "hari": hari, "bulan": bulan, "tahun": tahun,
-                        "jenis": "TARIK TABUNGAN", "kategori": kategori if kategori else "Tabungan", "keterangan": keterangan, "nominal": int(nominal)
+                        "tanggal": tgl_str, "jenis": "TARIK TABUNGAN",
+                        "kategori": kategori if kategori else "Tabungan",
+                        "keterangan": keterangan, "nominal": int(nominal)
                     }
                     riwayat.append(transaksi_baru)
                     save_data(riwayat)
