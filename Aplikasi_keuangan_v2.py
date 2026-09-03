@@ -7,7 +7,7 @@ from datetime import datetime, date
 
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(
-    page_title="Aplikasi Keuangan Keluarga DonnY",
+    page_title="Aplikasi Keuangan DY FAMILY",
     page_icon="💰",
     layout="wide"
 )
@@ -105,7 +105,7 @@ for data in riwayat:
         total_tabungan -= nominal
 
 # --- HEADER UTAMA ---
-st.title("💰 APLIKASI KEUANGAN KELUARGA DonnY")
+st.title("💰 APLIKASI KEUANGAN DY FAMILY")
 st.caption("Kelola Pemasukan, Pengeluaran, dan Tabungan Keluarga dengan Mudah")
 
 # Notifikasi Pesan
@@ -394,7 +394,7 @@ elif menu == "7. Hapus Data":
 elif menu == "8. Keluar/Info":
     st.info("""
     ===============================  
-    === TERIMA KASIH TELAH MENGGUNAKAN ===  
+        TERIMA KASIH TELAH MENGGUNAKAN  
          APLIKASI KEUANGAN KELUARGA DY  
     by.doni.p  
     ===============================
