@@ -1,35 +1,37 @@
-import json
-import os
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, date
+from streamlit_gsheets import GSheetsConnection
 
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(
-    page_title="Aplikasi Keuangan DY FAMILY",
+    page_title="Aplikasi Keuangan Keluarga Donny",
     page_icon="💰",
     layout="wide"
 )
 
-# --- FUNGSI HELPER & DATA ---
-FILE_DATA = "data_keuangan.json"
+# --- KONEKSI KE GOOGLE SHEETS ---
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+def load_data():
+    try:
+        df = conn.read(ttl="0s")
+        if df.empty or "nominal" not in df.columns:
+            return []
+        # Bersihkan data NaN/kosong
+        df = df.dropna(how="all")
+        df["nominal"] = pd.to_numeric(df["nominal"], errors="coerce").fillna(0).astype(int)
+        return df.to_dict(orient="records")
+    except Exception:
+        return []
+
+def save_data(data_list):
+    df_new = pd.DataFrame(data_list)
+    conn.update(data=df_new)
 
 def format_rupiah(angka):
     return f"Rp{angka:,.0f}".replace(",", ".")
-
-def load_data():
-    if os.path.exists(FILE_DATA):
-        try:
-            with open(FILE_DATA, "r") as f:
-                return json.load(f)
-        except Exception:
-            return []
-    return []
-
-def save_data(data):
-    with open(FILE_DATA, "w") as f:
-        json.dump(data, f, indent=4)
 
 # --- FUNGSI RESET FORM (CALLBACK) ---
 def reset_form_pemasukan():
@@ -52,7 +54,7 @@ def reset_form_pemasukan():
         st.session_state["pem_kategori"] = ""
         st.session_state["pem_keterangan"] = ""
         st.session_state["pem_nominal"] = 0
-        st.session_state["pesan_sukses"] = "Data pemasukan berhasil disimpan!"
+        st.session_state["pesan_sukses"] = "Data pemasukan berhasil disimpan ke Google Sheets!"
     else:
         st.session_state["pesan_peringatan"] = "Nominal harus lebih dari 0."
 
@@ -76,7 +78,7 @@ def reset_form_pengeluaran():
         st.session_state["peng_kategori"] = ""
         st.session_state["peng_keterangan"] = ""
         st.session_state["peng_nominal"] = 0
-        st.session_state["pesan_sukses"] = "Data pengeluaran berhasil disimpan!"
+        st.session_state["pesan_sukses"] = "Data pengeluaran berhasil disimpan ke Google Sheets!"
     else:
         st.session_state["pesan_peringatan"] = "Nominal harus lebih dari 0."
 
@@ -89,7 +91,7 @@ total_pengeluaran = 0
 total_tabungan = 0
 
 for data in riwayat:
-    nominal = data.get("nominal", 0)
+    nominal = int(data.get("nominal", 0))
     jenis = data.get("jenis", "")
     if jenis == "PEMASUKAN":
         saldo += nominal
@@ -105,8 +107,8 @@ for data in riwayat:
         total_tabungan -= nominal
 
 # --- HEADER UTAMA ---
-st.title("💰 APLIKASI KEUANGAN DY FAMILY")
-st.caption("Kelola Pemasukan, Pengeluaran, dan Tabungan Keluarga dengan Mudah")
+st.title("💰 APLIKASI KEUANGAN KELUARGA DONNY")
+st.caption("Tersimpan Permanen & Real-time di Google Sheets")
 
 # Notifikasi Pesan
 if "pesan_sukses" in st.session_state:
@@ -269,7 +271,7 @@ elif menu == "4. Riwayat":
     )
     
     if len(riwayat) == 0:
-        st.info("Belum ada transaksi.")
+        st.info("Belum ada transaksi di Google Sheets.")
     else:
         filtered_data = []
         if "1. Semua Transaksi" in sub_riwayat:
@@ -277,25 +279,25 @@ elif menu == "4. Riwayat":
         elif "2. Riwayat Harian" in sub_riwayat:
             cari_tgl = st.date_input("Pilih Tanggal Cari")
             tgl_target = cari_tgl.strftime("%d/%m/%Y")
-            filtered_data = [item for item in riwayat if item.get("tanggal") == tgl_target]
+            filtered_data = [item for item in riwayat if str(item.get("tanggal")) == tgl_target]
         elif "3. Riwayat Bulanan" in sub_riwayat:
             bln = st.selectbox("Bulan", [f"{i:02d}" for i in range(1, 13)])
             thn = st.text_input("Tahun", str(datetime.now().year))
-            filtered_data = [item for item in riwayat if item.get("tanggal", "").split("/")[1] == bln and item.get("tanggal", "").split("/")[2] == thn] if thn else []
+            filtered_data = [item for item in riwayat if str(item.get("tanggal", "")).split("/")[1] == bln and str(item.get("tanggal", "")).split("/")[2] == thn] if thn else []
         elif "4. Riwayat Tahunan" in sub_riwayat:
             thn = st.text_input("Tahun", str(datetime.now().year))
-            filtered_data = [item for item in riwayat if item.get("tanggal", "").split("/")[2] == thn] if thn else []
+            filtered_data = [item for item in riwayat if str(item.get("tanggal", "")).split("/")[2] == thn] if thn else []
 
         if not filtered_data and "1. Semua Transaksi" not in sub_riwayat:
             st.warning("Tidak ada transaksi ditemukan pada kriteria tersebut.")
         else:
             for idx, item in enumerate(reversed(filtered_data), 1):
-                with st.expander(f"📌 {item.get('tanggal')} - {item.get('jenis')} - {format_rupiah(item.get('nominal', 0))}"):
+                with st.expander(f"📌 {item.get('tanggal')} - {item.get('jenis')} - {format_rupiah(int(item.get('nominal', 0)))}"):
                     st.write(f"**Tanggal:** {item.get('tanggal')}")
                     st.write(f"**Jenis:** {item.get('jenis')}")
                     st.write(f"**Kategori:** {item.get('kategori')}")
                     st.write(f"**Keterangan:** {item.get('keterangan')}")
-                    st.write(f"**Nominal:** {format_rupiah(item.get('nominal', 0))}")
+                    st.write(f"**Nominal:** {format_rupiah(int(item.get('nominal', 0)))}")
 
 # 5. LIHAT SALDO
 elif menu == "5. Lihat Saldo":
@@ -342,11 +344,11 @@ elif menu == "6. Excel / Import & Export":
                 st.write("Preview Data:")
                 st.dataframe(df_upload.head())
                 
-                if st.button("Simpan Data ke Aplikasi", type="primary"):
+                if st.button("Simpan Data ke Google Sheets", type="primary"):
                     data_baru = df_upload.to_dict(orient="records")
                     riwayat.extend(data_baru)
                     save_data(riwayat)
-                    st.success("Berhasil mengimpor data transaksi!")
+                    st.success("Berhasil mengimpor data transaksi ke Google Sheets!")
                     st.rerun()
             except Exception as e:
                 st.error(f"Gagal membaca file: {e}")
@@ -365,7 +367,7 @@ elif menu == "7. Hapus Data":
         else:
             daftar_pilihan = []
             for idx, item in enumerate(riwayat):
-                label = f"[{idx+1}] {item.get('tanggal')} | {item.get('jenis')} | {item.get('kategori')} | {format_rupiah(item.get('nominal', 0))} ({item.get('keterangan', '-')})"
+                label = f"[{idx+1}] {item.get('tanggal')} | {item.get('jenis')} | {item.get('kategori')} | {format_rupiah(int(item.get('nominal', 0)))} ({item.get('keterangan', '-')})"
                 daftar_pilihan.append((idx, label))
             
             pilihan = st.selectbox(
@@ -377,7 +379,7 @@ elif menu == "7. Hapus Data":
             if st.button("Hapus Transaksi Ini", type="primary"):
                 transaksi_dihapus = riwayat.pop(pilihan)
                 save_data(riwayat)
-                st.success(f"Transaksi '{transaksi_dihapus.get('jenis')}' sebesar {format_rupiah(transaksi_dihapus.get('nominal', 0))} berhasil dihapus!")
+                st.success(f"Transaksi '{transaksi_dihapus.get('jenis')}' sebesar {format_rupiah(int(transaksi_dihapus.get('nominal', 0)))} berhasil dihapus dari Google Sheets!")
                 st.rerun()
 
     # --- TAB 2: RESET SEMUA ---
@@ -387,15 +389,15 @@ elif menu == "7. Hapus Data":
         if konfirmasi:
             if st.button("🔴 HAPUS SEMUA DATA SEKARANG", type="primary"):
                 save_data([])
-                st.success("Semua data transaksi berhasil dihapus!")
+                st.success("Semua data transaksi di Google Sheets berhasil dibersihkan!")
                 st.rerun()
 
 # 8. KELUAR / INFO
 elif menu == "8. Keluar/Info":
     st.info("""
     ===============================  
-        TERIMA KASIH TELAH MENGGUNAKAN  
-         APLIKASI KEUANGAN DY FAMILY  
+    === TERIMA KASIH TELAH MENGGUNAKAN ===  
+         APLIKASI KEUANGAN KELUARGA DONNY  
     by.doni.p  
     ===============================
     """)
