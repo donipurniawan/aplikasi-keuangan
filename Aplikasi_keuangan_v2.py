@@ -7,7 +7,7 @@ from datetime import datetime, date
 
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(
-    page_title="Aplikasi Keuangan Keluarga DY",
+    page_title="Aplikasi Keuangan Keluarga DonnY",
     page_icon="💰",
     layout="wide"
 )
