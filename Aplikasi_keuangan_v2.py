@@ -395,7 +395,7 @@ elif menu == "8. Keluar/Info":
     st.info("""
     ===============================  
         TERIMA KASIH TELAH MENGGUNAKAN  
-         APLIKASI KEUANGAN KELUARGA DY  
+         APLIKASI KEUANGAN DY FAMILY  
     by.doni.p  
     ===============================
     """)
