@@ -105,7 +105,7 @@ for data in riwayat:
         total_tabungan -= nominal
 
 # --- HEADER UTAMA ---
-st.title("💰 APLIKASI KEUANGAN KELUARGA DY")
+st.title("💰 APLIKASI KEUANGAN KELUARGA DonnY")
 st.caption("Kelola Pemasukan, Pengeluaran, dan Tabungan Keluarga dengan Mudah")
 
 # Notifikasi Pesan
