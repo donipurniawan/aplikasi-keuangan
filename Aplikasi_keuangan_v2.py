@@ -10,6 +10,21 @@ st.set_page_config(
     layout="centered"
 )
 
+# --- INISIALISASI SESSION STATE (Memori Input) ---
+if "pem_kategori" not in st.session_state:
+    st.session_state["pem_kategori"] = ""
+if "pem_keterangan" not in st.session_state:
+    st.session_state["pem_keterangan"] = ""
+if "pem_nominal" not in st.session_state:
+    st.session_state["pem_nominal"] = 0
+
+if "peng_kategori" not in st.session_state:
+    st.session_state["peng_kategori"] = ""
+if "peng_keterangan" not in st.session_state:
+    st.session_state["peng_keterangan"] = ""
+if "peng_nominal" not in st.session_state:
+    st.session_state["peng_nominal"] = 0
+
 # --- FUNGSI HELPER & DATA ---
 FILE_DATA = "data_keuangan.json"
 
@@ -29,7 +44,7 @@ def save_data(data):
     with open(FILE_DATA, "w") as f:
         json.dump(data, f, indent=4)
 
-# Hitung Ulang Saldo dari Data JSON
+# Hitung Ulang Saldo
 riwayat = load_data()
 
 saldo = 0
@@ -81,9 +96,11 @@ menu = st.sidebar.radio(
 if menu == "1. Pemasukan":
     st.subheader("=== MENU PEMASUKAN ===")
     tgl_selected = st.date_input("Masukkan Tanggal", max_value=date.today())
-    kategori = st.text_input("Kategori")
-    keterangan = st.text_input("Keterangan")
-    nominal = st.number_input("Nominal (Rp)", min_value=0, step=1000)
+    
+    # Input tersimpan otomatis di session_state
+    kategori = st.text_input("Kategori", key="pem_kategori")
+    keterangan = st.text_input("Keterangan", key="pem_keterangan")
+    nominal = st.number_input("Nominal (Rp)", min_value=0, step=1000, key="pem_nominal")
     
     if st.button("Simpan Pemasukan", type="primary"):
         if nominal <= 0:
@@ -100,15 +117,22 @@ if menu == "1. Pemasukan":
             riwayat.append(transaksi_baru)
             save_data(riwayat)
             st.success("Data pemasukan berhasil disimpan!")
+            
+            # Reset form pemasukan setelah simpan
+            st.session_state["pem_kategori"] = ""
+            st.session_state["pem_keterangan"] = ""
+            st.session_state["pem_nominal"] = 0
             st.rerun()
 
 # 2. PENGELUARAN
 elif menu == "2. Pengeluaran":
     st.subheader("=== MENU PENGELUARAN ===")
     tgl_selected = st.date_input("Masukkan Tanggal", max_value=date.today())
-    kategori = st.text_input("Kategori")
-    keterangan = st.text_input("Keterangan")
-    nominal = st.number_input("Nominal (Rp)", min_value=0, step=1000)
+    
+    # Input tersimpan otomatis di session_state
+    kategori = st.text_input("Kategori", key="peng_kategori")
+    keterangan = st.text_input("Keterangan", key="peng_keterangan")
+    nominal = st.number_input("Nominal (Rp)", min_value=0, step=1000, key="peng_nominal")
     
     if st.button("Simpan Pengeluaran", type="primary"):
         if nominal <= 0:
@@ -125,6 +149,11 @@ elif menu == "2. Pengeluaran":
             riwayat.append(transaksi_baru)
             save_data(riwayat)
             st.success("Data Pengeluaran berhasil disimpan.")
+            
+            # Reset form pengeluaran setelah simpan
+            st.session_state["peng_kategori"] = ""
+            st.session_state["peng_keterangan"] = ""
+            st.session_state["peng_nominal"] = 0
             st.rerun()
 
 # 3. TABUNGAN
@@ -223,7 +252,7 @@ elif menu == "6. Hapus Data":
     konfirmasi = st.checkbox("Saya yakin ingin menghapus seluruh data transaksi.")
     if konfirmasi:
         if st.button("🔴 HAPUS SEMUA DATA SEKARANG", type="primary"):
-            save_data([]) # Mengosongkan file JSON
+            save_data([])
             st.success("Semua data transaksi berhasil dihapus!")
             st.rerun()
 
