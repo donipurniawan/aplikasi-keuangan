@@ -52,7 +52,6 @@ def reset_form_pemasukan():
         save_data(riwayat_data)
         st.session_state["pem_kategori"] = ""
         st.session_state["pem_keterangan"] = ""
-        st.session_state["pem_nom_raw"] = ""
         st.session_state["pem_nominal"] = 0
         st.session_state["pesan_sukses"] = "Data pemasukan berhasil disimpan ke Google Sheets!"
     else:
@@ -77,7 +76,6 @@ def reset_form_pengeluaran():
         save_data(riwayat_data)
         st.session_state["peng_kategori"] = ""
         st.session_state["peng_keterangan"] = ""
-        st.session_state["peng_nom_raw"] = ""
         st.session_state["peng_nominal"] = 0
         st.session_state["pesan_sukses"] = "Data pengeluaran berhasil disimpan ke Google Sheets!"
     else:
@@ -209,13 +207,7 @@ elif menu == "1. Pemasukan":
     st.text_input("Kategori", key="pem_kategori")
     st.text_input("Keterangan", key="pem_keterangan")
     
-    nom_input = st.text_input("Nominal (Rp)", placeholder="Contoh: 12000", key="pem_nom_raw")
-    nom_clean = "".join(filter(str.isdigit, nom_input))
-    nom_val = int(nom_clean) if nom_clean else 0
-    st.session_state["pem_nominal"] = nom_val
-    
-    if nom_val > 0:
-        st.info(f"💵 Tampilan Nominal: **{format_rupiah(nom_val)}**")
+    st.number_input("Nominal (Rp)", value=None, placeholder="Ketik nominal di sini...", key="pem_nominal")
     
     st.button("Simpan Pemasukan", type="primary", on_click=reset_form_pemasukan)
 
@@ -226,13 +218,7 @@ elif menu == "2. Pengeluaran":
     st.text_input("Kategori", key="peng_kategori")
     st.text_input("Keterangan", key="peng_keterangan")
     
-    nom_input = st.text_input("Nominal (Rp)", placeholder="Contoh: 12000", key="peng_nom_raw")
-    nom_clean = "".join(filter(str.isdigit, nom_input))
-    nom_val = int(nom_clean) if nom_clean else 0
-    st.session_state["peng_nominal"] = nom_val
-    
-    if nom_val > 0:
-        st.info(f"💵 Tampilan Nominal: **{format_rupiah(nom_val)}**")
+    st.number_input("Nominal (Rp)", value=None, placeholder="Ketik nominal di sini...", key="peng_nominal")
     
     st.button("Simpan Pengeluaran", type="primary", on_click=reset_form_pengeluaran)
 
@@ -243,16 +229,10 @@ elif menu == "3. Tabungan":
     sub_pilihan = st.radio("Pilih Jenis Transaksi Tabungan", ["1. Setor Tabungan (Simpan Uang)", "2. Tarik Tabungan (Ambil Uang)"])
     kategori = st.text_input("Kategori")
     keterangan = st.text_input("Keterangan")
-    
-    nom_input = st.text_input("Nominal (Rp)", placeholder="Contoh: 12000")
-    nom_clean = "".join(filter(str.isdigit, nom_input))
-    nominal = int(nom_clean) if nom_clean else 0
-    
-    if nominal > 0:
-        st.info(f"💵 Tampilan Nominal: **{format_rupiah(nominal)}**")
+    nominal = st.number_input("Nominal (Rp)", value=None, placeholder="Ketik nominal di sini...")
     
     if st.button("Simpan Tabungan", type="primary"):
-        if nominal <= 0:
+        if not nominal or nominal <= 0:
             st.warning("Nominal harus lebih dari 0.")
         else:
             tgl_str = tgl_selected.strftime("%d/%m/%Y")
