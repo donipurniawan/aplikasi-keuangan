@@ -7,14 +7,32 @@ from datetime import datetime, date
 
 # --- KONFIGURASI HALAMAN ---
 st.set_page_config(
-    page_title="Aplikasi Keuangan Keluarga DonnY",
+    page_title="Aplikasi Keuangan Keluarga DY",
     page_icon="💰",
     layout="wide"
 )
 
+# --- FUNGSI HELPER & DATA ---
+FILE_DATA = "data_keuangan.json"
+
+def format_rupiah(angka):
+    return f"Rp{angka:,.0f}".replace(",", ".")
+
+def load_data():
+    if os.path.exists(FILE_DATA):
+        try:
+            with open(FILE_DATA, "r") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def save_data(data):
+    with open(FILE_DATA, "w") as f:
+        json.dump(data, f, indent=4)
+
 # --- FUNGSI RESET FORM (CALLBACK) ---
 def reset_form_pemasukan():
-    # Simpan data sebelum reset
     tgl_str = st.session_state.get("pem_tgl", date.today()).strftime("%d/%m/%Y")
     kat = st.session_state.get("pem_kategori", "")
     ket = st.session_state.get("pem_keterangan", "")
@@ -62,25 +80,6 @@ def reset_form_pengeluaran():
     else:
         st.session_state["pesan_peringatan"] = "Nominal harus lebih dari 0."
 
-# --- FUNGSI HELPER & DATA ---
-FILE_DATA = "data_keuangan.json"
-
-def format_rupiah(angka):
-    return f"Rp{angka:,.0f}".replace(",", ".")
-
-def load_data():
-    if os.path.exists(FILE_DATA):
-        try:
-            with open(FILE_DATA, "r") as f:
-                return json.load(f)
-        except Exception:
-            return []
-    return []
-
-def save_data(data):
-    with open(FILE_DATA, "w") as f:
-        json.dump(data, f, indent=4)
-
 # Hitung Ulang Saldo
 riwayat = load_data()
 
@@ -109,7 +108,7 @@ for data in riwayat:
 st.title("💰 APLIKASI KEUANGAN KELUARGA DY")
 st.caption("Kelola Pemasukan, Pengeluaran, dan Tabungan Keluarga dengan Mudah")
 
-# Tampilkan notifikasi jika ada pesan tersimpan
+# Notifikasi Pesan
 if "pesan_sukses" in st.session_state:
     st.success(st.session_state["pesan_sukses"])
     del st.session_state["pesan_sukses"]
@@ -145,7 +144,17 @@ st.divider()
 # --- MENU KEUANGAN (SIDEBAR) ---
 menu = st.sidebar.radio(
     "=== MENU KEUANGAN ===",
-    ["📊 Dashboard & Grafik", "1. Pemasukan", "2. Pengeluaran", "3. Tabungan", "4. Riwayat", "5. Lihat Saldo", "6. Hapus Data", "7. Keluar/Info"]
+    [
+        "📊 Dashboard & Grafik", 
+        "1. Pemasukan", 
+        "2. Pengeluaran", 
+        "3. Tabungan", 
+        "4. Riwayat", 
+        "5. Lihat Saldo", 
+        "6. Excel / Import & Export", 
+        "7. Hapus Data", 
+        "8. Keluar/Info"
+    ]
 )
 
 # 📊 DASHBOARD & GRAFIK
@@ -298,20 +307,91 @@ elif menu == "5. Lihat Saldo":
     st.write(f"**Total Pengeluaran:** {format_rupiah(total_pengeluaran)}")
     st.write(f"**Total Tabungan:** {format_rupiah(total_tabungan)}")
 
-# 6. HAPUS DATA
-elif menu == "6. Hapus Data":
-    st.subheader("🗑️ Hapus / Reset Semua Data Transaksi")
-    st.warning("Tindakan ini akan menghapus SELURUH catatan transaksi dan mengembalikan saldo ke Rp0.")
+# 6. EXCEL / IMPORT & EXPORT
+elif menu == "6. Excel / Import & Export":
+    st.subheader("📁 Olah Data Excel / CSV")
     
-    konfirmasi = st.checkbox("Saya yakin ingin menghapus seluruh data transaksi.")
-    if konfirmasi:
-        if st.button("🔴 HAPUS SEMUA DATA SEKARANG", type="primary"):
-            save_data([])
-            st.success("Semua data transaksi berhasil dihapus!")
-            st.rerun()
+    col_ex, col_im = st.columns(2)
+    
+    with col_ex:
+        st.markdown("### 📥 Download Laporan (Export)")
+        if len(riwayat) > 0:
+            df_download = pd.DataFrame(riwayat)
+            csv_data = df_download.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="Download Data Keuangan (CSV / Excel)",
+                data=csv_data,
+                file_name=f"Laporan_Keuangan_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv",
+                type="primary"
+            )
+        else:
+            st.info("Belum ada data untuk diunduh.")
 
-# 7. KELUAR / INFO
-elif menu == "7. Keluar/Info":
+    with col_im:
+        st.markdown("### 📤 Upload Data Baru (Import)")
+        uploaded_file = st.file_uploader("Upload file Excel (.xlsx) atau CSV (.csv)", type=["xlsx", "csv"])
+        
+        if uploaded_file is not None:
+            try:
+                if uploaded_file.name.endswith('.csv'):
+                    df_upload = pd.read_csv(uploaded_file)
+                else:
+                    df_upload = pd.read_excel(uploaded_file)
+                    
+                st.write("Preview Data:")
+                st.dataframe(df_upload.head())
+                
+                if st.button("Simpan Data ke Aplikasi", type="primary"):
+                    data_baru = df_upload.to_dict(orient="records")
+                    riwayat.extend(data_baru)
+                    save_data(riwayat)
+                    st.success("Berhasil mengimpor data transaksi!")
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Gagal membaca file: {e}")
+
+# 7. HAPUS DATA
+elif menu == "7. Hapus Data":
+    st.subheader("🗑️ Kelola Pembatalan / Penghapusan Data")
+    
+    tab1, tab2 = st.tabs(["❌ Hapus Per Transaksi (Per Unit)", "🔴 Reset Semua Data"])
+    
+    # --- TAB 1: HAPUS PER UNIT / PER TRANSAKSI ---
+    with tab1:
+        st.markdown("##### Hapus salah satu transaksi jika ada kesalahan input:")
+        if len(riwayat) == 0:
+            st.info("Belum ada data transaksi yang dapat dihapus.")
+        else:
+            daftar_pilihan = []
+            for idx, item in enumerate(riwayat):
+                label = f"[{idx+1}] {item.get('tanggal')} | {item.get('jenis')} | {item.get('kategori')} | {format_rupiah(item.get('nominal', 0))} ({item.get('keterangan', '-')})"
+                daftar_pilihan.append((idx, label))
+            
+            pilihan = st.selectbox(
+                "Pilih transaksi yang ingin dihapus:",
+                options=[p[0] for p in daftar_pilihan],
+                format_func=lambda x: [p[1] for p in daftar_pilihan if p[0] == x][0]
+            )
+            
+            if st.button("Hapus Transaksi Ini", type="primary"):
+                transaksi_dihapus = riwayat.pop(pilihan)
+                save_data(riwayat)
+                st.success(f"Transaksi '{transaksi_dihapus.get('jenis')}' sebesar {format_rupiah(transaksi_dihapus.get('nominal', 0))} berhasil dihapus!")
+                st.rerun()
+
+    # --- TAB 2: RESET SEMUA ---
+    with tab2:
+        st.warning("Tindakan ini akan menghapus SELURUH catatan transaksi tanpa terkecuali!")
+        konfirmasi = st.checkbox("Saya yakin ingin menghapus SELURUH data transaksi.")
+        if konfirmasi:
+            if st.button("🔴 HAPUS SEMUA DATA SEKARANG", type="primary"):
+                save_data([])
+                st.success("Semua data transaksi berhasil dihapus!")
+                st.rerun()
+
+# 8. KELUAR / INFO
+elif menu == "8. Keluar/Info":
     st.info("""
     ===============================  
     === TERIMA KASIH TELAH MENGGUNAKAN ===  
