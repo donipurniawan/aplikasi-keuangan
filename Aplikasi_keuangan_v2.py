@@ -32,15 +32,14 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# HELPER FUNCTIONS & DATA MANAGEMENT (FIXED)
+# HELPER FUNCTIONS & DATA MANAGEMENT
 # ==========================================
 def load_data():
-    """Membaca data dari file JSON menggunakan pandas agar format konsisten."""
+    """Membaca data dari file JSON agar tersimpan permanen."""
     if os.path.exists(DATA_FILE):
         try:
             df_loaded = pd.read_json(DATA_FILE)
             if not df_loaded.empty:
-                # Pastikan kolom wajib tersedia
                 cols = ["id", "tanggal", "jenis", "pos_tabungan", "kategori", "keterangan", "nominal"]
                 for c in cols:
                     if c not in df_loaded.columns:
@@ -51,9 +50,8 @@ def load_data():
     return pd.DataFrame(columns=["id", "tanggal", "jenis", "pos_tabungan", "kategori", "keterangan", "nominal"])
 
 def save_data(df_input):
-    """Menyimpan dataframe ke file JSON tanpa error serialization."""
+    """Menyimpan dataframe ke file JSON permanen."""
     clean_df = df_input.copy()
-    # Hapus kolom temporary tanggal_dt jika ada agar tidak bentrok JSON serialization
     if "tanggal_dt" in clean_df.columns:
         clean_df = clean_df.drop(columns=["tanggal_dt"])
     clean_df.to_json(DATA_FILE, orient="records", indent=4)
@@ -70,7 +68,6 @@ if "df" not in st.session_state:
 
 df = st.session_state.df.copy()
 
-# Buat kolom temporary tanggal_dt khusus untuk pengurutan dan grafik
 if not df.empty:
     df["tanggal_dt"] = pd.to_datetime(df["tanggal"], format="%d/%m/%Y", errors="coerce")
 else:
@@ -79,18 +76,15 @@ else:
 # ==========================================
 # CALCULATIONS
 # ==========================================
-pemasukan_total = int(df[df["jenis"] == "PEMASUKAN"]["nominal"].sum())
-pengeluaran_total = int(df[df["jenis"] == "PENGELUARAN"]["nominal"].sum())
-setor_tabungan_total = int(df[df["jenis"] == "SETOR TABUNGAN"]["nominal"].sum())
-tarik_tabungan_total = int(df[df["jenis"] == "TARIK TABUNGAN"]["nominal"].sum())
+pemasukan_total = int(df[df["jenis"] == "PEMASUKAN"]["nominal"].sum()) if not df.empty else 0
+pengeluaran_total = int(df[df["jenis"] == "PENGELUARAN"]["nominal"].sum()) if not df.empty else 0
+setor_tabungan_total = int(df[df["jenis"] == "SETOR TABUNGAN"]["nominal"].sum()) if not df.empty else 0
+tarik_tabungan_total = int(df[df["jenis"] == "TARIK TABUNGAN"]["nominal"].sum()) if not df.empty else 0
 
-# Saldo Dompet Utama
 saldo_utama = pemasukan_total - pengeluaran_total - setor_tabungan_total + tarik_tabungan_total
-# Total Seluruh Tabungan
 total_tabungan_bersih = setor_tabungan_total - tarik_tabungan_total
 
-# Breakdown Tabungan Per Pos
-tabungan_df = df[df["jenis"].isin(["SETOR TABUNGAN", "TARIK TABUNGAN"])].copy()
+tabungan_df = df[df["jenis"].isin(["SETOR TABUNGAN", "TARIK TABUNGAN"])].copy() if not df.empty else pd.DataFrame()
 if not tabungan_df.empty:
     tabungan_summary = tabungan_df.groupby(["pos_tabungan", "jenis"])["nominal"].sum().unstack(fill_value=0)
     if "SETOR TABUNGAN" not in tabungan_summary.columns:
@@ -120,7 +114,6 @@ if menu == "Dashboard & Ringkasan":
     st.title("📊 Dashboard Keuangan Keluarga DY")
     st.caption("Ringkasan arus kas dan alokasi tabungan keluarga secara real-time.")
     
-    # KPI Metrics Row
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("💰 Saldo Dompet Utama", format_rupiah(saldo_utama), 
@@ -137,7 +130,6 @@ if menu == "Dashboard & Ringkasan":
 
     st.markdown("---")
     
-    # Visualisasi
     c1, c2 = st.columns(2)
     with c1:
         st.subheader("📈 Tren Alur Keuangan")
@@ -177,33 +169,37 @@ elif menu == "Tambah Transaksi":
             jenis_input = st.selectbox("Jenis Transaksi", ["PEMASUKAN", "PENGELUARAN"])
         with col2:
             kategori_input = st.text_input("Kategori", placeholder="contoh: Gaji, Makanan, Belanja, Listrik")
-            nominal_input = st.number_input("Nominal (Rp)", min_value=1, step=10000)
+            # KOSONG DENGAN PREFIX Rp.
+            nominal_input = st.number_input("Nominal", min_value=1, step=10000, value=None, placeholder="Rp. 0")
             
         keterangan_input = st.text_area("Keterangan Catatan", placeholder="Detail deskripsi transaksi...")
         
         submitted = st.form_submit_button("💾 Simpan Transaksi")
         
         if submitted:
-            new_id = int(datetime.now().timestamp() * 1000)
-            tgl_str = tanggal_input.strftime("%d/%m/%Y")
-            
-            new_row = {
-                "id": int(new_id),
-                "tanggal": str(tgl_str),
-                "jenis": str(jenis_input),
-                "pos_tabungan": "-",
-                "kategori": str(kategori_input) if kategori_input else "Umum",
-                "keterangan": str(keterangan_input),
-                "nominal": int(nominal_input)
-            }
-            
-            st.session_state.df = pd.concat([st.session_state.df, pd.DataFrame([new_row])], ignore_index=True)
-            save_data(st.session_state.df)
-            st.success(f"Berhasil menyimpan {jenis_input} sebesar {format_rupiah(nominal_input)}")
-            st.rerun()
+            if nominal_input is None or nominal_input <= 0:
+                st.error("⚠️ Harap isi nominal transaksi terlebih dahulu!")
+            else:
+                new_id = int(datetime.now().timestamp() * 1000)
+                tgl_str = tanggal_input.strftime("%d/%m/%Y")
+                
+                new_row = {
+                    "id": int(new_id),
+                    "tanggal": str(tgl_str),
+                    "jenis": str(jenis_input),
+                    "pos_tabungan": "-",
+                    "kategori": str(kategori_input) if kategori_input else "Umum",
+                    "keterangan": str(keterangan_input),
+                    "nominal": int(nominal_input)
+                }
+                
+                st.session_state.df = pd.concat([st.session_state.df, pd.DataFrame([new_row])], ignore_index=True)
+                save_data(st.session_state.df)
+                st.success(f"Berhasil menyimpan {jenis_input} sebesar {format_rupiah(nominal_input)}")
+                st.rerun()
 
 # ==========================================
-# MENU 3: MANAJEMEN TABUNGAN (POS TERPISAH)
+# MENU 3: MANAJEMEN TABUNGAN
 # ==========================================
 elif menu == "Manajemen Tabungan":
     st.title("🏦 Manajemen Pos Tabungan")
@@ -232,37 +228,41 @@ elif menu == "Manajemen Tabungan":
             pos_custom = st.text_input("Atau buat Pos Baru:")
             pos_final = pos_custom.strip() if pos_custom.strip() != "" else pos_pilihan
             
-            nominal_tab = st.number_input("Nominal (Rp)", min_value=1, step=50000)
+            # KOSONG DENGAN PREFIX Rp.
+            nominal_tab = st.number_input("Nominal", min_value=1, step=50000, value=None, placeholder="Rp. 0")
             ket_tab = st.text_input("Keterangan", placeholder="contoh: Setoran bulanan")
             
             sub_tab = st.form_submit_button("💾 Proses Tabungan")
             
             if sub_tab:
-                valid = True
-                if jenis_tabungan == "SETOR TABUNGAN" and nominal_tab > saldo_utama:
-                    st.error("Saldo Utama tidak cukup untuk disetor ke tabungan!")
-                    valid = False
-                elif jenis_tabungan == "TARIK TABUNGAN":
-                    saldo_pos_saat_ini = tabungan_summary.loc[pos_final, "Saldo Akhir"] if pos_final in tabungan_summary.index else 0
-                    if nominal_tab > saldo_pos_saat_ini:
-                        st.error(f"Saldo pos '{pos_final}' tidak mencukupi! (Tersedia: {format_rupiah(saldo_pos_saat_ini)})")
+                if nominal_tab is None or nominal_tab <= 0:
+                    st.error("⚠️ Harap masukkan nominal tabungan!")
+                else:
+                    valid = True
+                    if jenis_tabungan == "SETOR TABUNGAN" and nominal_tab > saldo_utama:
+                        st.error("Saldo Utama tidak cukup untuk disetor ke tabungan!")
                         valid = False
-                
-                if valid:
-                    new_id = int(datetime.now().timestamp() * 1000)
-                    new_row = {
-                        "id": int(new_id),
-                        "tanggal": str(tgl_tabungan.strftime("%d/%m/%Y")),
-                        "jenis": str(jenis_tabungan),
-                        "pos_tabungan": str(pos_final),
-                        "kategori": "Tabungan",
-                        "keterangan": str(ket_tab),
-                        "nominal": int(nominal_tab)
-                    }
-                    st.session_state.df = pd.concat([st.session_state.df, pd.DataFrame([new_row])], ignore_index=True)
-                    save_data(st.session_state.df)
-                    st.success(f"Berhasil {jenis_tabungan} pada pos '{pos_final}'")
-                    st.rerun()
+                    elif jenis_tabungan == "TARIK TABUNGAN":
+                        saldo_pos_saat_ini = tabungan_summary.loc[pos_final, "Saldo Akhir"] if pos_final in tabungan_summary.index else 0
+                        if nominal_tab > saldo_pos_saat_ini:
+                            st.error(f"Saldo pos '{pos_final}' tidak mencukupi! (Tersedia: {format_rupiah(saldo_pos_saat_ini)})")
+                            valid = False
+                    
+                    if valid:
+                        new_id = int(datetime.now().timestamp() * 1000)
+                        new_row = {
+                            "id": int(new_id),
+                            "tanggal": str(tgl_tabungan.strftime("%d/%m/%Y")),
+                            "jenis": str(jenis_tabungan),
+                            "pos_tabungan": str(pos_final),
+                            "kategori": "Tabungan",
+                            "keterangan": str(ket_tab),
+                            "nominal": int(nominal_tab)
+                        }
+                        st.session_state.df = pd.concat([st.session_state.df, pd.DataFrame([new_row])], ignore_index=True)
+                        save_data(st.session_state.df)
+                        st.success(f"Berhasil {jenis_tabungan} pada pos '{pos_final}'")
+                        st.rerun()
 
     with col_chart:
         st.subheader("📊 Visualisasi Saldo Pos Tabungan")
@@ -315,7 +315,7 @@ elif menu == "Riwayat & Hapus Data":
         
         with col_del1:
             st.subheader("🗑️ Hapus Per Item")
-            id_to_delete = st.number_input("Masukkan ID Transaksi:", step=1, value=0)
+            id_to_delete = st.number_input("Masukkan ID Transaksi:", step=1, value=None, placeholder="Masukkan ID")
             if st.button("Hapus Transaksi", type="secondary"):
                 if id_to_delete in df["id"].values:
                     st.session_state.df = df[df["id"] != id_to_delete]
